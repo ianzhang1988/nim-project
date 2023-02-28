@@ -1,4 +1,4 @@
-import os
+import os, threadpool
 import system
 
 echo("Chat application started")
@@ -10,7 +10,9 @@ let serverAddr = paramStr(1)
 echo("connect to ", serverAddr)
 
 while true:
-    var message = stdin.readLine()
+    var message_f = spawn stdin.readLine()
+    
+    var message = ^message_f
     if message == "#quit":
         break
     
