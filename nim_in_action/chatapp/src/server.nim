@@ -25,6 +25,9 @@ proc processMessages(server: Server, client: Client) {.async.} =
             client.socket.close()
             return
         echo(client, " sent: ", line)
+        for c in server.clients:
+            if c.id != client.id and c.connected:
+                await c.socket.send(line & "\c\l")
 
 
 proc serve( server: Server, port = 7777) {.async.} = 
