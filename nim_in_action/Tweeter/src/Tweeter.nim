@@ -4,13 +4,21 @@ import database, views/user, views/general
 
 let db = newDatabase()
 
+
+proc userLogin(db :Database, request : Request,  user: var User ): bool =
+  if request.cookies.hasKey("username"):
+    let username = request.cookies["username"]
+    if not db.findUser(username, user):
+      user = User(username: username, following: @[])
+      db.create(user)
+    return true
+  else:
+    return false
+
 routes:
   get "/":
-    if request.cookies.hasKey("username"):
-      var user: User
-      if not db.findUser(request.cookies["username"], user):
-        user = User(username: request.cookies["username"], following: @[])
-        db.create(user)
+    var user: User
+    if userLogin(db, request, user):
       let messages = db.findMessages(user.following & user.username)
       resp renderMain(renderTimeline(user.username, messages))
     else:
@@ -30,12 +38,29 @@ routes:
     redirect("/")
 
   get "/@name":
-    cond '.' notin @"name"
+    cond '.' notin @"name" # pass /style.css
     var user: User
     if not db.findUser(@"name", user):
       halt "User not Found"
     
     let messages = db.findMessages(@[user.username])
-    resp renderMain( renderUser(user) & renderMessages(messages))
+
+    var currentUser: User
+    if db.userLogin(request, currentUser) :
+      resp renderMain(renderUser(user, currentUser) & renderMessages(messages))
+    else:
+      resp renderMain( renderUser(user) & renderMessages(messages))
+
+  post "/follow":
+    var follower : User
+    var target : User
+    if not db.findUser(@"follower", follower):
+      halt "follower not Found"
+    if not db.findUser(@"target", target):
+      halt "target not Found"
+
+    db.follow(follower, target)
+
+    redirect("/" & @"target")
 
 runForever()
