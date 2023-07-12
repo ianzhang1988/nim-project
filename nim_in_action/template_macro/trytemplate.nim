@@ -4,3 +4,9 @@ template repeat( num: int, statements: untyped) =
 
 repeat 3:
     echo("hi!")
+
+proc main() =
+    repeat 3:
+        echo("hi! from main.")
+
+main()
