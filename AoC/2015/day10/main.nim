@@ -11,13 +11,41 @@
 
 import strformat, strutils, sequtils
 
-proc findDiffCharIdx(input: string):int =
-    let first = input[0]
-    for i, c in input:
-        if c != first:
-            return i
-    # all the same, diff is len
-    return input.len
+when compileOption("profiler"):
+  import nimprof
+
+# Entry: 1/9 Calls: 2543/2555 = 99.53% [sum: 2543; 2543/2555 = 99.53%]
+#   /root/.choosenim/toolchains/nim-2.0.0/lib/system/iterators_1.nim: [] 2544/2555 = 99.57%
+#   /root/.choosenim/toolchains/nim-2.0.0/lib/system.nim: lookAndSay 2551/2555 = 99.84%
+# so iterators is slow
+# proc findDiffCharIdx(input: string):int =
+#     let first = input[0]
+#     for i, c in input:
+#         if c != first:
+#             return i
+#     # all the same, diff is len
+#     return input.len
+
+# Entry: 1/10 Calls: 2498/2515 = 99.32% [sum: 2498; 2498/2515 = 99.32%]
+#   /root/.choosenim/toolchains/nim-2.0.0/lib/system/indices.nim: [] 2498/2515 = 99.32%
+#   /root/.choosenim/toolchains/nim-2.0.0/lib/system.nim: lookAndSay 2509/2515 = 99.76%
+# proc findDiffCharIdx(input: string):int =
+#     var diff = 0
+#     let first = input[0]
+#     while diff < input.len:
+#         if input[diff] != first:
+#             return diff
+#         diff += 1
+#     return input.len
+
+proc findDiffCharIdx(input: var string, start: int):int =
+    var diff = start
+    let first = input[start]
+    while diff < input.len:
+        if input[diff] != first:
+            return diff - start
+        diff += 1
+    return (input.len - start)
 
 # too many recursion
 # seems that in release this can also be optmise by c compiler
@@ -48,12 +76,12 @@ proc findDiffCharIdx(input: string):int =
 #     acc.add(start)
 #     lookAndSay(input, pos+num, acc)
 
+# this is good
+# probably, in func above new string used most cpu
 proc lookAndSay(input: var string, acc: var seq[string]) =
     var pos = 0
     while pos < input.len:
-        # if pos == input.len:
-        #     break
-        let idx = findDiffCharIdx(input[pos..^1])
+        let idx = findDiffCharIdx(input, pos)
         let num = idx
         let start = fmt"{num}{input[pos]}"
         acc.add(start)
