@@ -111,3 +111,5 @@ proc main() =
     echo fmt"output {input.len}"
 
 main()
+
+# recursion in nim is not well supported. in this case, it's leaky. some momeory is not released.
