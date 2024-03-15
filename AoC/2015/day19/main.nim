@@ -35,7 +35,7 @@
 
 # How long will it take to make the medicine? Given the available replacements and the medicine molecule in your puzzle input, what is the fewest number of steps to go from e to the medicine molecule?
 
-import strutils, sequtils, sets, algorithm
+import strutils, sequtils, sets, algorithm, tables, strformat
 
 let inputTest="""H => HO
 H => OH
@@ -43,7 +43,7 @@ O => HH
 e => H
 e => O
 
-HOHOHO"""
+HOHHOHOHOO""" # 10
 
 proc parse(input: string): (seq[(string, string)], string) =
     let lines = input.splitLines()
@@ -127,12 +127,48 @@ proc part2_1(replacements:seq[(string, string)], molecule: string) =
 
     echo "num: ", counter
 
-proc backtarceMolecule(replacements:var seq[(string, string)], molecule: string) =
-    discard
+proc backtarceMolecule(cache: var Table[string, int], replacements: seq[(string, string)], molecule: string): int =
+    # echo fmt"debug {molecule} {depth}" 
+
+    if molecule == "e":
+        return 0
+
+    if cache.contains(molecule):
+        return cache[molecule]
+
+    var depthSeq:seq[int]
+
+    for (`from`, to) in replacements:
+        var pos = 0
+
+        while true:
+            let idx = molecule.find(to, pos)
+            if idx < 0:
+                break
+
+            pos = idx + to.len
+            
+            let nextMolecule = molecule[0..idx-1] & `from` & molecule[idx + to.len..^1]
+
+            # echo nextMolecule
+            let short = backtarceMolecule(cache, replacements, nextMolecule)
+            depthSeq.add(short)
+            
+    if depthSeq.len == 0 or max(depthSeq) < 0:
+        cache[molecule]= -1
+        return -1
+
+    let newDepth = depthSeq.filterIt(it >= 0)
+    # echo fmt"debug2 {molecule} {newDepth} {cache}" 
+    cache[molecule] = min(newDepth) + 1
+    return min(newDepth) + 1
 
 proc part2(replacements:seq[(string, string)], molecule: string) =
     # backtracing the steps
-    discard
+    var cache: Table[string, int]
+    let shortest = backtarceMolecule(cache, replacements, molecule)
+    echo "cache num:", cache.len
+    echo "num: ", shortest
 
 proc main() =
     let input = readFile("input")
