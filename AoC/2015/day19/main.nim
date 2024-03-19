@@ -35,7 +35,7 @@
 
 # How long will it take to make the medicine? Given the available replacements and the medicine molecule in your puzzle input, what is the fewest number of steps to go from e to the medicine molecule?
 
-import strutils, sequtils, sets, algorithm, tables, strformat
+import strutils, sequtils, sets, algorithm, tables, strformat, deques
 
 let inputTest="""H => HO
 H => OH
@@ -43,7 +43,8 @@ O => HH
 e => H
 e => O
 
-HOHHOHOHOO""" # 10
+HOHHOHOHHH""" 
+# HOHHOHOHOO # 10
 
 proc parse(input: string): (seq[(string, string)], string) =
     let lines = input.splitLines()
@@ -163,11 +164,66 @@ proc backtarceMolecule(cache: var Table[string, int], replacements: seq[(string,
     cache[molecule] = min(newDepth) + 1
     return min(newDepth) + 1
 
-proc part2(replacements:seq[(string, string)], molecule: string) =
-    # backtracing the steps
+proc Molecule(replacements: seq[(string, string)], molecule: string): int =
+    type
+        Frame = object
+            molecule: string
+            replaceIdx: int
+            pos: int
+            depth: int
+
     var cache: Table[string, int]
-    let shortest = backtarceMolecule(cache, replacements, molecule)
-    echo "cache num:", cache.len
+    var stack: Deque[Frame]
+
+    stack.addFirst(Frame(molecule: molecule))
+    var counter = 0
+    while true:
+        if stack.len == 0:
+            break
+
+        let frame = stack.peekFirst
+        # echo frame
+
+        # counter+=1
+        # if counter > 1000:
+        #     echo frame
+        #     break
+        
+        # check if frame valid
+        if frame.replaceIdx >= replacements.len:
+            discard stack.popFirst
+            continue
+
+        if frame.molecule == "e":
+            if result == 0:
+                result = frame.depth
+            if result > frame.depth:
+                result = frame.depth
+            # echo frame
+            discard stack.popFirst
+            continue
+
+        let (`from`, to) = replacements[frame.replaceIdx]
+        let idx = frame.molecule.find(to, frame.pos)
+        if idx < 0:
+            discard stack.popFirst
+            stack.addFirst(Frame(molecule: frame.molecule, replaceIdx: frame.replaceIdx+1, depth: frame.depth))
+            continue
+
+        let nextMolecule = frame.molecule[0..idx-1] & `from` & frame.molecule[idx + to.len..^1]
+
+        discard stack.popFirst
+        stack.addFirst(Frame(molecule: frame.molecule, replaceIdx: frame.replaceIdx, pos: idx + to.len, depth: frame.depth))
+        stack.addFirst(Frame(molecule: nextMolecule, depth: frame.depth+1))
+
+proc part2(replacements:seq[(string, string)], molecule: string) =
+    # # backtracing the steps
+    # var cache: Table[string, int]
+    # let shortest = backtarceMolecule(cache, replacements, molecule)
+    # echo "cache num:", cache.len
+    # echo "num: ", shortest
+    # itertive
+    let shortest = Molecule(replacements, molecule)
     echo "num: ", shortest
 
 proc main() =
