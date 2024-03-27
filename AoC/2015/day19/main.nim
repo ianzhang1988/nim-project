@@ -43,7 +43,7 @@ O => HH
 e => H
 e => O
 
-HOHHOHOHHH""" 
+HOHHOHOHO""" 
 # HOHHOHOHOO # 10
 
 proc parse(input: string): (seq[(string, string)], string) =
@@ -172,7 +172,7 @@ proc Molecule(replacements: seq[(string, string)], molecule: string): int =
             pos: int
             depth: int
 
-    var cache: Table[string, int]
+    var cache: Table[string, int] # have no idea where to put this :(
     var stack: Deque[Frame]
 
     stack.addFirst(Frame(molecule: molecule))
@@ -216,6 +216,56 @@ proc Molecule(replacements: seq[(string, string)], molecule: string): int =
         stack.addFirst(Frame(molecule: frame.molecule, replaceIdx: frame.replaceIdx, pos: idx + to.len, depth: frame.depth))
         stack.addFirst(Frame(molecule: nextMolecule, depth: frame.depth+1))
 
+proc Molecule2(replacements: seq[(string, string)], molecule: string): int =
+    # https://www.reddit.com/r/adventofcode/comments/3xflz8/comment/cy4etju/
+    let special = @["Rn", "Y", "Ar"]
+    var atom : seq[string]
+    for r in replacements:
+        if r[0] notin atom:
+            atom.add(r[0])
+        var mole = r[1]
+        if not("Rn" in mole or "Y" in mole):
+            continue
+        for s in special:
+            mole = mole.replace(s, ",")
+        let parts = mole.split(",")
+        for p in parts:
+            if p == "":
+                continue
+            if p notin atom:
+                atom.add(p)
+    echo atom
+
+    var counter_atom = 0
+    var counter_RnAr = 0
+    var counter_Y = 0
+
+    var pos = 0
+    while true:
+        if pos >= molecule.len:
+            break
+        # echo molecule[pos..^1]
+        #echo fmt"{molecule[pos]}"
+        if molecule[pos..pos+1] in atom:
+            counter_atom += 1
+            pos += 2
+            continue
+        if fmt"{molecule[pos]}" in atom:
+            counter_atom += 1
+            pos += 1
+            continue
+        if molecule[pos..pos+1] in @["Rn", "Ar"]:
+            counter_RnAr += 1
+            pos += 2
+            continue
+        if molecule[pos] == 'Y':
+            counter_Y += 1
+            pos += 1
+            continue
+    #counter_atom - counter_RnAr - 2*counter_Y - 1
+    return  counter_atom - counter_Y - 1
+
+            
 proc part2(replacements:seq[(string, string)], molecule: string) =
     # # backtracing the steps
     # var cache: Table[string, int]
@@ -223,14 +273,17 @@ proc part2(replacements:seq[(string, string)], molecule: string) =
     # echo "cache num:", cache.len
     # echo "num: ", shortest
     # itertive
-    let shortest = Molecule(replacements, molecule)
+    let shortest = Molecule2(replacements, molecule)
     echo "num: ", shortest
 
 proc main() =
     let input = readFile("input")
-    var (replacements, molecule) = parse(inputTest)
+    var (replacements, molecule) = parse(input)
     # part1(replacements, molecule)
     part2(replacements, molecule)
 
-main()
+when compileOption("profiler"):
+    import nimprof
 
+main()
+# --profiler:on --stackTrace:on
