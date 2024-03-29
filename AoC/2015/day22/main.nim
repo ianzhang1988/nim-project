@@ -34,40 +34,45 @@
 # - Player has 2 hit points, 0 armor, 24 mana
 # - Boss has 3 hit points
 # Poison deals 3 damage. This kills the boss, and the player wins.
+
+
+
+
+
 # Now, suppose the same initial conditions, except that the boss has 14 hit points instead:
 
-# -- Player turn --
+# 0-- Player turn --
 # - Player has 10 hit points, 0 armor, 250 mana
 # - Boss has 14 hit points
 # Player casts Recharge.
 
-# -- Boss turn --
+# 1-- Boss turn --
 # - Player has 10 hit points, 0 armor, 21 mana
 # - Boss has 14 hit points
 # Recharge provides 101 mana; its timer is now 4.
 # Boss attacks for 8 damage!
 
-# -- Player turn --
+# 2-- Player turn --
 # - Player has 2 hit points, 0 armor, 122 mana
 # - Boss has 14 hit points
 # Recharge provides 101 mana; its timer is now 3.
 # Player casts Shield, increasing armor by 7.
 
-# -- Boss turn --
+# 3-- Boss turn --
 # - Player has 2 hit points, 7 armor, 110 mana
 # - Boss has 14 hit points
 # Shield's timer is now 5.
 # Recharge provides 101 mana; its timer is now 2.
 # Boss attacks for 8 - 7 = 1 damage!
 
-# -- Player turn --
+# 4-- Player turn --
 # - Player has 1 hit point, 7 armor, 211 mana
 # - Boss has 14 hit points
 # Shield's timer is now 4.
 # Recharge provides 101 mana; its timer is now 1.
 # Player casts Drain, dealing 2 damage, and healing 2 hit points.
 
-# -- Boss turn --
+# 5-- Boss turn --
 # - Player has 3 hit points, 7 armor, 239 mana
 # - Boss has 12 hit points
 # Shield's timer is now 3.
@@ -75,20 +80,20 @@
 # Recharge wears off.
 # Boss attacks for 8 - 7 = 1 damage!
 
-# -- Player turn --
+# 6-- Player turn --
 # - Player has 2 hit points, 7 armor, 340 mana
 # - Boss has 12 hit points
 # Shield's timer is now 2.
 # Player casts Poison.
 
-# -- Boss turn --
+# 7-- Boss turn --
 # - Player has 2 hit points, 7 armor, 167 mana
 # - Boss has 12 hit points
 # Shield's timer is now 1.
 # Poison deals 3 damage; its timer is now 5.
 # Boss attacks for 8 - 7 = 1 damage!
 
-# -- Player turn --
+# 8-- Player turn --
 # - Player has 1 hit point, 7 armor, 167 mana
 # - Boss has 9 hit points
 # Shield's timer is now 0.
@@ -96,7 +101,7 @@
 # Poison deals 3 damage; its timer is now 4.
 # Player casts Magic Missile, dealing 4 damage.
 
-# -- Boss turn --
+# 9-- Boss turn --
 # - Player has 1 hit point, 0 armor, 114 mana
 # - Boss has 2 hit points
 # Poison deals 3 damage. This kills the boss, and the player wins.
@@ -105,3 +110,142 @@
 # Hit Points: 55
 # Damage: 8
 
+import sequtils
+
+type
+    Character = object
+        HP: int
+        mana: int
+        armor: int
+        damage: int
+        effect: seq[Effect]
+    MagicType = enum
+        Missile, Drain, Shield, Poison, Recharge
+    Magic = object of RootObj
+        magicType: MagicType
+        cost: int
+        damage: int
+        heal: int
+        last: int
+        armor: int
+        mana: int
+    Effect = object of Magic
+        endTurn: int
+
+
+let missile = Magic(magicType: Missile, cost: 53, damage: 4)
+let drain = Magic(magicType: Drain, cost: 73, damage: 2, heal: 2)
+let shield = Magic(magicType: Shield, cost: 113, armor: 7, last: 6)
+let poison = Magic(magicType: Poison, cost: 173, damage: 3, last: 6)
+let recharge = Magic(magicType: Recharge, cost: 229, damage: 0, last: 5, mana: 101)
+
+proc castMagic(player: Character, boss: Character, magic: Magic, currentTurn: int): (Character, Character) =
+    var playerNext = player
+    var bossNext = boss
+    playerNext.mana -= magic.cost
+    case magic.magicType:
+    of Missile, Drain:
+        playerNext.HP += magic.heal
+        bossNext.HP -= magic.damage
+    of Shield, Recharge:
+        playerNext.armor += magic.armor
+        var effect: Effect = cast[Effect](magic)
+        effect.endTurn = currentTurn + magic.last + 1
+        playerNext.effect.add(effect)
+    of Poison:
+        var effect: Effect = cast[Effect](magic)
+        effect.endTurn = currentTurn + magic.last + 1
+        bossNext.effect.add(effect)
+    return (playerNext, bossNext)
+
+proc attack(player: Character, boss: Character): (Character, Character) =
+    var playerNext = player
+    var damage = boss.damage - player.armor
+    if damage < 1:
+        damage = 1
+    playerNext.HP -= damage
+    return (playerNext, boss)
+
+proc applyEffect(character: var Character, currentTurn: int) =
+    let validEffect = character.effect.filterIt(it.endTurn != currentTurn)
+    let wearsOffShield = character.effect.filterIt(it.endTurn == currentTurn and it.magicType == Shield)
+    if wearsOffShield.len > 0:
+        character.armor = 0
+    
+    for e in validEffect:
+        case e.magicType:
+        of Recharge:
+            character.mana += e.mana
+        of Poison:
+            character.HP -= e.damage
+        else:
+            discard
+
+    character.effect = validEffect
+
+
+proc testPlay() =
+# For example, suppose the player has 10 hit points and 250 mana, and that the boss has 13 hit points and 8 damage:
+    var player = Character(HP:10, mana: 250)
+    var boss = Character(HP:14, damage: 8)
+
+    var turn = 0
+
+    proc helper(magic: Magic) =
+        if turn mod 2 == 0:
+            # player turn
+            echo turn, "--- player trun ----------------------"
+        else:
+            echo turn, "--- boss trun ------------------------"
+
+        echo "player:", player
+        echo "boss:", boss
+        applyEffect(player, turn)
+        applyEffect(boss, turn)
+        echo "--- effect ---"
+        echo "player:", player
+        echo "boss:", boss
+        if turn mod 2 == 0:
+            # player turn
+            (player, boss) = castMagic(player, boss, magic, turn)
+        else:
+            (player, boss) = attack(player, boss)
+        # echo "player:", player
+        # echo "boss:", boss
+
+    helper(recharge)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(shield)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(drain)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(poison)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(missile)
+    turn += 1
+    helper(Magic())
+    turn += 1
+
+proc testSeqCopy() =
+    var test = Character()
+    test.effect.add(Effect(cost:10))
+    echo test
+    var test2 = test
+    test.effect.add(Effect(cost:20))
+    echo test
+    echo test2
+    # so seq in a Character is indeed deep copy
+
+proc main()=
+    #testSeqCopy()
+    testPlay()
+
+main()
