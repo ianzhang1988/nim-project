@@ -119,6 +119,7 @@ type
         armor: int
         damage: int
         effect: seq[Effect]
+        usedMana: int
     MagicType = enum
         Missile, Drain, Shield, Poison, Recharge
     Magic = object of RootObj
@@ -133,6 +134,11 @@ type
         endTurn: int
 
 
+# Magic Missile costs 53 mana. It instantly does 4 damage.
+# Drain costs 73 mana. It instantly does 2 damage and heals you for 2 hit points.
+# Shield costs 113 mana. It starts an effect that lasts for 6 turns. While it is active, your armor is increased by 7.
+# Poison costs 173 mana. It starts an effect that lasts for 6 turns. At the start of each turn while it is active, it deals the boss 3 damage.
+# Recharge costs 229 mana. It starts an effect that lasts for 5 turns. At the start of each turn while it is active, it gives you 101 new mana.
 let missile = Magic(magicType: Missile, cost: 53, damage: 4)
 let drain = Magic(magicType: Drain, cost: 73, damage: 2, heal: 2)
 let shield = Magic(magicType: Shield, cost: 113, armor: 7, last: 6)
@@ -142,7 +148,10 @@ let recharge = Magic(magicType: Recharge, cost: 229, damage: 0, last: 5, mana: 1
 proc castMagic(player: Character, boss: Character, magic: Magic, currentTurn: int): (Character, Character) =
     var playerNext = player
     var bossNext = boss
+    if playerNext.mana < magic.cost:
+        return (playerNext, bossNext)
     playerNext.mana -= magic.cost
+    playerNext.usedMana += magic.cost
     case magic.magicType:
     of Missile, Drain:
         playerNext.HP += magic.heal
@@ -183,6 +192,13 @@ proc applyEffect(character: var Character, currentTurn: int) =
 
     character.effect = validEffect
 
+proc magicActive(magic: MagicType, player: Character, boss: Character) :bool =
+    for e in player.effect:
+        if e.magicType == magic:
+            return true
+    for e in boss.effect:
+        if e.magicType == magic:
+            return true
 
 proc testPlay() =
 # For example, suppose the player has 10 hit points and 250 mana, and that the boss has 13 hit points and 8 damage:
@@ -234,6 +250,8 @@ proc testPlay() =
     helper(Magic())
     turn += 1
 
+    echo "mana used:", player.usedMana
+
 proc testSeqCopy() =
     var test = Character()
     test.effect.add(Effect(cost:10))
@@ -244,8 +262,147 @@ proc testSeqCopy() =
     echo test2
     # so seq in a Character is indeed deep copy
 
+proc findLowestManaCost() =
+    var stack :seq[(Character, Character, int)]
+
+    var player = Character(HP:50, mana: 500)
+    var boss = Character(HP:55, damage: 8)
+    
+    var lowest = -1
+    var counter = 0
+
+    stack.add((player,boss,0))
+
+    while len(stack) > 0:
+        counter+=1
+        # if counter>10:
+        #     break
+        var (player, boss, turn) = stack.pop()
+
+        if boss.HP <= 0:
+            if lowest < 0:
+                lowest = player.usedMana
+            if lowest > player.usedMana:
+                lowest = player.usedMana
+            continue
+
+        if player.HP <= 0:
+            continue
+
+
+        applyEffect(player, turn)
+        applyEffect(boss, turn)
+        
+        if boss.HP <= 0:
+            if lowest < 0:
+                lowest = player.usedMana
+            if lowest > player.usedMana:
+                lowest = player.usedMana
+            continue
+
+        if player.HP <= 0:
+            continue
+
+        let magic = @[missile,drain,shield, poison,recharge]
+
+        if turn mod 2 == 0:
+        # player turn
+            for m in magic:
+                if magicActive(m.magicType, player, boss):
+                    continue
+                if player.mana < m.cost:
+                    continue
+                let (nextplayer, nextboss) = castMagic(player, boss, m, turn)
+                stack.add((nextPlayer, nextBoss, turn + 1))
+        else:
+            let (nextplayer, nextboss) = attack(player, boss)
+            stack.add((nextPlayer, nextBoss, turn + 1))
+
+    echo "lowset mana:", lowest
+    echo "counter:", counter
+# On the next run through the game, you increase the difficulty to hard.
+
+# At the start of each player turn (before any other effects apply), you lose 1 hit point. If this brings you to or below 0 hit points, you lose.
+
+# With the same starting stats for you and the boss, what is the least amount of mana you can spend and still win the fight?
+
+proc findLowestManaCostHard() =
+    var stack :seq[(Character, Character, int, seq[MagicType])]
+
+    # var player = Character(HP:10, mana: 250)
+    # var boss = Character(HP:14, damage: 8)
+    var player = Character(HP:50, mana: 500)
+    var boss = Character(HP:55, damage: 8)
+    
+    var lowest = -1
+    var counter = 0
+    var magicLowest:seq[MagicType]
+
+    stack.add((player,boss,0,@[]))
+
+    while len(stack) > 0:
+        counter+=1
+        # if counter>10:
+        #     break
+        var (player, boss, turn, magicUsed) = stack.pop()
+        
+        if boss.HP <= 0:
+            if lowest < 0:
+                lowest = player.usedMana
+                magicLowest = magicUsed
+            if lowest > player.usedMana:
+                lowest = player.usedMana
+                magicLowest = magicUsed
+            continue
+
+        if player.HP <= 0:
+            continue
+        
+        if turn mod 2 == 0:
+            player.HP -= 1
+
+        if player.HP <= 0:
+            continue
+
+        applyEffect(player, turn)
+        applyEffect(boss, turn)
+        
+        if boss.HP <= 0:
+            if lowest < 0:
+                lowest = player.usedMana
+                magicLowest = magicUsed
+            if lowest > player.usedMana:
+                lowest = player.usedMana
+                magicLowest = magicUsed
+            continue
+
+        if player.HP <= 0:
+            continue
+
+        let magic = @[missile,drain,shield, poison,recharge]
+
+        if turn mod 2 == 0:
+        # player turn
+            for m in magic:
+                if magicActive(m.magicType, player, boss):
+                    continue
+                if player.mana < m.cost:
+                    continue
+                let (nextplayer, nextboss) = castMagic(player, boss, m, turn)
+                stack.add((nextPlayer, nextBoss, turn + 1, magicUsed & m.magicType))
+        else:
+            let (nextplayer, nextboss) = attack(player, boss)
+            stack.add((nextPlayer, nextBoss, turn + 1, magicUsed))
+
+    echo "lowset mana:", lowest
+    echo "migic seq:", magicLowest
+    echo "counter:", counter
+    
+
 proc main()=
     #testSeqCopy()
-    testPlay()
+    # testPlay()
+    #findLowestManaCost() # 953
+    findLowestManaCostHard()
 
 main()
