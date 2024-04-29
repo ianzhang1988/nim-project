@@ -159,11 +159,11 @@ proc castMagic(player: Character, boss: Character, magic: Magic, currentTurn: in
     of Shield, Recharge:
         playerNext.armor += magic.armor
         var effect: Effect = cast[Effect](magic)
-        effect.endTurn = currentTurn + magic.last + 1
+        effect.endTurn = currentTurn + magic.last
         playerNext.effect.add(effect)
     of Poison:
         var effect: Effect = cast[Effect](magic)
-        effect.endTurn = currentTurn + magic.last + 1
+        effect.endTurn = currentTurn + magic.last
         bossNext.effect.add(effect)
     return (playerNext, bossNext)
 
@@ -176,12 +176,15 @@ proc attack(player: Character, boss: Character): (Character, Character) =
     return (playerNext, boss)
 
 proc applyEffect(character: var Character, currentTurn: int) =
-    let validEffect = character.effect.filterIt(it.endTurn != currentTurn)
-    let wearsOffShield = character.effect.filterIt(it.endTurn == currentTurn and it.magicType == Shield)
-    if wearsOffShield.len > 0:
-        character.armor = 0
+    # let validEffect = character.effect.filterIt(it.endTurn != currentTurn)
+    # let wearsOffShield = character.effect.filterIt(it.endTurn == currentTurn and it.magicType == Shield)
+    # if wearsOffShield.len > 0:
+    #     character.armor = 0
+
+    # here I got messed up with the timing, old code may miss timing the effect.
+    # in describtion, apply effect then decrease timer, my old code decrease timer then apply effect.
     
-    for e in validEffect:
+    for e in character.effect:
         case e.magicType:
         of Recharge:
             character.mana += e.mana
@@ -189,6 +192,11 @@ proc applyEffect(character: var Character, currentTurn: int) =
             character.HP -= e.damage
         else:
             discard
+
+    let validEffect = character.effect.filterIt(it.endTurn != currentTurn)
+    let wearsOffShield = character.effect.filterIt(it.endTurn == currentTurn and it.magicType == Shield)
+    if wearsOffShield.len > 0:
+        character.armor = 0
 
     character.effect = validEffect
 
@@ -252,6 +260,73 @@ proc testPlay() =
 
     echo "mana used:", player.usedMana
 
+proc testPlay2() =
+    var player = Character(HP:50, mana: 500)
+    var boss = Character(HP:55, damage: 8)
+
+    var turn = 0
+
+    proc helper(magic: Magic) =
+        if turn mod 2 == 0:
+            # player turn
+            echo turn, "--- player trun ----------------------"
+        else:
+            echo turn, "--- boss trun ------------------------"
+
+        echo "player:", player
+        echo "boss:", boss
+        applyEffect(player, turn)
+        applyEffect(boss, turn)
+        echo "--- effect ---"
+        echo "player:", player
+        echo "boss:", boss
+        if turn mod 2 == 0:
+            # player turn
+            (player, boss) = castMagic(player, boss, magic, turn)
+        else:
+            (player, boss) = attack(player, boss)
+        # echo "player:", player
+        # echo "boss:", boss
+
+    helper(poison)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(drain)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(recharge)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(poison)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(shield)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(recharge)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(poison)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(drain)
+    turn += 1
+    helper(Magic())
+    turn += 1
+    helper(missile)
+    turn += 1
+    helper(Magic())
+    turn += 1
+
+    echo "mana used:", player.usedMana
+
 proc testSeqCopy() =
     var test = Character()
     test.effect.add(Effect(cost:10))
@@ -275,9 +350,13 @@ proc findLowestManaCost() =
 
     while len(stack) > 0:
         counter+=1
-        # if counter>10:
+        # if counter>100:
         #     break
+
         var (player, boss, turn) = stack.pop()
+        # echo turn, " ----------------"
+        # echo player
+        # echo boss
 
         if boss.HP <= 0:
             if lowest < 0:
@@ -326,11 +405,15 @@ proc findLowestManaCost() =
 
 # With the same starting stats for you and the boss, what is the least amount of mana you can spend and still win the fight?
 
+# this is one of the correct solution 
+# 1289
+# ['Poison', 'Drain', 'Recharge', 'Poison', 'Shield', 'Recharge', 'Poison', 'Drain', 'Magic_Missile']
+
 proc findLowestManaCostHard() =
     var stack :seq[(Character, Character, int, seq[MagicType])]
 
-    # var player = Character(HP:10, mana: 250)
-    # var boss = Character(HP:14, damage: 8)
+    # var player = Character(HP:40, mana: 500)
+    # var boss = Character(HP:55, damage: 8)
     var player = Character(HP:50, mana: 500)
     var boss = Character(HP:55, damage: 8)
     
@@ -357,6 +440,12 @@ proc findLowestManaCostHard() =
 
         if player.HP <= 0:
             continue
+
+        # 2024-04-29: skip cost that higher than lowest
+        # this is why it take so much time 
+        if lowest > 0:
+            if player.usedMana > lowest:
+                continue
         
         if turn mod 2 == 0:
             player.HP -= 1
@@ -401,7 +490,8 @@ proc findLowestManaCostHard() =
 
 proc main()=
     #testSeqCopy()
-    # testPlay()
+    #testPlay()
+    #testPlay2()
     #findLowestManaCost() # 953
     findLowestManaCostHard()
 

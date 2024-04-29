@@ -23,7 +23,6 @@ def parse_input():
     #         a = 'hp'
     #     a = a.lower()
     #     boss[a] = int(b)
-    boss = {"hp": 55, "damage":8}
 
     spells = []
     for line in open('spells.txt'):
@@ -52,21 +51,35 @@ def parse_input():
         'mana_used': 0,
         'effects': {},
     }
-    if boss['hp'] < 50:
-        player.update({'hp': 10, 'mana': 250})
+    boss = {"hp": 55, "damage":8}
+    # player = {
+    #     'hp': 40, 
+    #     'mana': 500,
+    #     'armor': 0,
+    #     'mana_used': 0,
+    #     'effects': {},
+    # }
+    # boss = {"hp": 55, "damage":8}
 
     return player, boss, spells
 
 class BadState(Exception):
     pass
 
+counter = 0
+
 class State:
-    def __init__(self, player, boss, spells, part, spell=None):
+    def __init__(self, player, boss, spells, part, casted, spell=None):
         self.player = copy.deepcopy(player)
         self.boss = copy.deepcopy(boss)
         self.spells = spells
 
         self.part = part
+        global counter
+        counter += 1
+
+        self.casted = []
+        self.casted.extend(casted)
 
         if spell:
             if self.part == 2:
@@ -90,7 +103,9 @@ class State:
                 if spell['name'] in self.player['effects']:
                     raise BadState('Effect in use')
                 self.player['effects'][spell['name']] = spell = copy.deepcopy(spell)
+                self.casted.append(spell['name'])
             else:
+                self.casted.append(spell['name'])
                 self.player['hp'] += spell['hp']
                 self.boss['hp'] -= spell['damage']
                 if self.boss['hp'] <= 0:
@@ -143,7 +158,7 @@ class State:
         # next states
         for spell in self.spells:
             try:
-                yield self.__class__(self.player, self.boss, self.spells, self.part, spell)
+                yield self.__class__(self.player, self.boss, self.spells, self.part,self.casted, spell)
             except BadState:
                 pass
 
@@ -156,7 +171,7 @@ def part1(player, boss, spells):
         print(boss)
         pprint(spells)
 
-    state = State(player, boss, spells, 1)
+    state = State(player, boss, spells, 1,[])
     best = dfs(state)
     print(best.cost)
 
@@ -166,9 +181,11 @@ def part2(player, boss, spells):
         print(boss)
         pprint(spells)
 
-    state = State(player, boss, spells, 2)
+    state = State(player, boss, spells,2,[])
     best = dfs(state)
     print(best.cost)
+    print(best.casted)
+    print(counter)
 
 def main():
     data = parse_input()
