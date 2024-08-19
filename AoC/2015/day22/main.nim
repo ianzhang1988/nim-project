@@ -442,7 +442,7 @@ proc findLowestManaCostHard() =
             continue
 
         # 2024-04-29: skip cost that higher than lowest
-        # this is why it take so much time 
+        # without this is why it take so much time 
         if lowest > 0:
             if player.usedMana > lowest:
                 continue
